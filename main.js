@@ -36,45 +36,96 @@ async function startCameraAndDetect() {
         const hierarchy = new cv.Mat();
 
         const overlayCtx = overlayCanvas.getContext("2d");
+        let boardRect = null;
 
         function processFrame() {
           cap.read(src);
           cv.imshow("videoCanvas", src);
 
-          // Convert to grayscale
+          // Convert to grayscale and preprocess
           cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-
-          // Blur to reduce noise
           cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+          cv.threshold(blurred, thresh, 180, 255, cv.THRESH_BINARY);
 
-          // Adaptive threshold or Canny edge
-          cv.adaptiveThreshold(
-            blurred,
-            thresh,
-            255,
-            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv.THRESH_BINARY_INV,
-            11,
-            2
-          );
-
-          // Find contours
+          // Find contours for board detection
           cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-          // Draw boxes
-          overlayCtx.clearRect(0, 0, width, height);
-          overlayCtx.strokeStyle = "red";
-          overlayCtx.lineWidth = 2;
+          boardRect = null;
+          let maxArea = 0;
 
           for (let i = 0; i < contours.size(); ++i) {
             const cnt = contours.get(i);
             const rect = cv.boundingRect(cnt);
+            const area = rect.width * rect.height;
+            const aspect = rect.width / rect.height;
 
-            // Filter out small blobs
-            if (rect.width > 30 && rect.height > 30) {
-              overlayCtx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+            if (area > maxArea && aspect > 0.2 && aspect < 5) {
+              maxArea = area;
+              boardRect = rect;
             }
             cnt.delete();
+          }
+
+          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+          if (boardRect) {
+            // Draw gray board outline
+            overlayCtx.strokeStyle = "gray";
+            overlayCtx.lineWidth = 3;
+            overlayCtx.strokeRect(boardRect.x, boardRect.y, boardRect.width, boardRect.height);
+
+            // Crop to board ROI
+            const roi = gray.roi(boardRect);
+            const roiBlurred = new cv.Mat();
+            const roiThresh = new cv.Mat();
+
+            cv.GaussianBlur(roi, roiBlurred, new cv.Size(5, 5), 0);
+            cv.adaptiveThreshold(
+              roiBlurred,
+              roiThresh,
+              255,
+              cv.ADAPTIVE_THRESH_MEAN_C,
+              cv.THRESH_BINARY_INV,
+              11,
+              2
+            );
+
+            const defectContours = new cv.MatVector();
+            const defectHierarchy = new cv.Mat();
+
+            cv.findContours(
+              roiThresh,
+              defectContours,
+              defectHierarchy,
+              cv.RETR_EXTERNAL,
+              cv.CHAIN_APPROX_SIMPLE
+            );
+
+            // Draw red boxes inside board only
+            overlayCtx.strokeStyle = "red";
+            overlayCtx.lineWidth = 2;
+
+            for (let i = 0; i < defectContours.size(); ++i) {
+              const cnt = defectContours.get(i);
+              const rect = cv.boundingRect(cnt);
+
+              if (rect.width > 20 && rect.height > 20) {
+                overlayCtx.strokeRect(
+                  boardRect.x + rect.x,
+                  boardRect.y + rect.y,
+                  rect.width,
+                  rect.height
+                );
+              }
+
+              cnt.delete();
+            }
+
+            roi.delete();
+            roiBlurred.delete();
+            roiThresh.delete();
+            defectContours.delete();
+            defectHierarchy.delete();
           }
 
           requestAnimationFrame(processFrame);
