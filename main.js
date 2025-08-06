@@ -70,7 +70,7 @@ async function startCameraAndDetect() {
 
           if (boardRect) {
             // Draw gray board outline
-            overlayCtx.strokeStyle = "gray";
+            overlayCtx.strokeStyle = "blue";
             overlayCtx.lineWidth = 3;
             overlayCtx.strokeRect(boardRect.x, boardRect.y, boardRect.width, boardRect.height);
 
