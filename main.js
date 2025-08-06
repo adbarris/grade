@@ -69,7 +69,7 @@ async function startCameraAndDetect() {
           overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
           if (boardRect) {
-            // Draw gray board outline
+            // Draw board outline in blue
             overlayCtx.strokeStyle = "blue";
             overlayCtx.lineWidth = 3;
             overlayCtx.strokeRect(boardRect.x, boardRect.y, boardRect.width, boardRect.height);
@@ -80,15 +80,7 @@ async function startCameraAndDetect() {
             const roiThresh = new cv.Mat();
 
             cv.GaussianBlur(roi, roiBlurred, new cv.Size(5, 5), 0);
-            cv.adaptiveThreshold(
-              roiBlurred,
-              roiThresh,
-              255,
-              cv.ADAPTIVE_THRESH_MEAN_C,
-              cv.THRESH_BINARY_INV,
-              11,
-              2
-            );
+            cv.threshold(roiBlurred, roiThresh, 100, 255, cv.THRESH_BINARY_INV); // more stable threshold
 
             const defectContours = new cv.MatVector();
             const defectHierarchy = new cv.Mat();
@@ -101,7 +93,6 @@ async function startCameraAndDetect() {
               cv.CHAIN_APPROX_SIMPLE
             );
 
-            // Draw red boxes inside board only
             overlayCtx.strokeStyle = "red";
             overlayCtx.lineWidth = 2;
 
@@ -114,8 +105,8 @@ async function startCameraAndDetect() {
 
               // Filter small noise and board-sized false positives
               if (
-                rect.width > 20 &&
-                rect.height > 20 &&
+                rect.width > 30 &&
+                rect.height > 30 &&
                 defectArea < 0.6 * boardArea
               ) {
                 overlayCtx.strokeRect(
