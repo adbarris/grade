@@ -36,8 +36,7 @@ async function startCameraAndDetect() {
         const hierarchy = new cv.Mat();
 
         const overlayCtx = overlayCanvas.getContext("2d");
-        let boardRect = null;
-        let previousBoxes = [];
+        let previousBoxesByBoard = [];
 
         function processFrame() {
           cap.read(src);
@@ -48,11 +47,10 @@ async function startCameraAndDetect() {
           cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
           cv.threshold(blurred, thresh, 180, 255, cv.THRESH_BINARY);
 
-          // Detect board contour
+          // Detect board-like contours
           cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-          boardRect = null;
-          let maxArea = 0;
+          const boardRects = [];
 
           for (let i = 0; i < contours.size(); ++i) {
             const cnt = contours.get(i);
@@ -60,22 +58,22 @@ async function startCameraAndDetect() {
             const area = rect.width * rect.height;
             const aspect = rect.width / rect.height;
 
-            if (area > maxArea && aspect > 0.2 && aspect < 5) {
-              maxArea = area;
-              boardRect = rect;
+            if (area > 10000 && aspect > 0.2 && aspect < 5) {
+              boardRects.push(rect);
             }
             cnt.delete();
           }
 
           overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+          previousBoxesByBoard = [];
 
-          if (boardRect) {
-            // Draw blue board outline
+          boardRects.forEach((boardRect, boardIndex) => {
+            // Draw blue box for board
             overlayCtx.strokeStyle = "blue";
             overlayCtx.lineWidth = 3;
             overlayCtx.strokeRect(boardRect.x, boardRect.y, boardRect.width, boardRect.height);
 
-            // Crop to board ROI
+            // Analyze board region
             const roi = gray.roi(boardRect);
             const roiBlurred = new cv.Mat();
             const roiThresh = new cv.Mat();
@@ -83,7 +81,7 @@ async function startCameraAndDetect() {
             cv.GaussianBlur(roi, roiBlurred, new cv.Size(5, 5), 0);
             cv.threshold(roiBlurred, roiThresh, 100, 255, cv.THRESH_BINARY_INV);
 
-            // Morphological filtering (remove noise)
+            // Morphological filtering
             const kernel = cv.Mat.ones(3, 3, cv.CV_8U);
             cv.morphologyEx(roiThresh, roiThresh, cv.MORPH_OPEN, kernel);
             kernel.delete();
@@ -102,8 +100,8 @@ async function startCameraAndDetect() {
             let currentBoxes = [];
             const boardArea = boardRect.width * boardRect.height;
 
-            for (let i = 0; i < defectContours.size(); ++i) {
-              const cnt = defectContours.get(i);
+            for (let j = 0; j < defectContours.size(); ++j) {
+              const cnt = defectContours.get(j);
               const rect = cv.boundingRect(cnt);
               const defectArea = rect.width * rect.height;
 
@@ -123,25 +121,24 @@ async function startCameraAndDetect() {
               cnt.delete();
             }
 
-            // Only show boxes that were present in previous frame
+            // Show stable red boxes for defects
             overlayCtx.strokeStyle = "red";
             overlayCtx.lineWidth = 2;
             currentBoxes.forEach((box) => {
-              const isStable = previousBoxes.some((prev) => {
+              const isStable = previousBoxesByBoard[boardIndex]?.some((prev) => {
                 const dx = Math.abs(prev.x - box.x);
                 const dy = Math.abs(prev.y - box.y);
                 return dx < 15 && dy < 15;
-              });
+              }) ?? true;
 
               if (isStable) {
                 overlayCtx.strokeRect(box.x, box.y, box.w, box.h);
               }
             });
 
-            // Draw green cuttings (clear sections between defects)
+            // Cuttings (spaces between defects)
             const sortedBoxes = currentBoxes.sort((a, b) => a.x - b.x);
             const cuttingBoxes = [];
-
             let startX = boardRect.x;
             const endX = boardRect.x + boardRect.width;
 
@@ -158,7 +155,6 @@ async function startCameraAndDetect() {
               startX = box.x + box.w;
             });
 
-            // Final section to the right of last defect
             if (endX - startX > 30) {
               cuttingBoxes.push({
                 x: startX,
@@ -168,14 +164,35 @@ async function startCameraAndDetect() {
               });
             }
 
-            // Draw green boxes
+            // Draw green cutting boxes
             overlayCtx.strokeStyle = "green";
             overlayCtx.lineWidth = 2;
             cuttingBoxes.forEach((cut) => {
               overlayCtx.strokeRect(cut.x, cut.y, cut.w, cut.h);
             });
 
-            previousBoxes = currentBoxes;
+            previousBoxesByBoard[boardIndex] = currentBoxes;
+
+            // === 📋 GRADING LOGIC ===
+            const defectCount = currentBoxes.length;
+            let grade = "FAS";
+            if (defectCount === 0) {
+              grade = "FAS";
+            } else if (defectCount <= 2) {
+              grade = "1C";
+            } else {
+              grade = "2C";
+            }
+
+            // === ✏️ Draw label ===
+            overlayCtx.fillStyle = "white";
+            overlayCtx.font = "bold 24px Arial";
+            overlayCtx.lineWidth = 4;
+            overlayCtx.strokeStyle = "black";
+            const labelX = boardRect.x + 10;
+            const labelY = boardRect.y + 30;
+            overlayCtx.strokeText(`Grade: ${grade}`, labelX, labelY);
+            overlayCtx.fillText(`Grade: ${grade}`, labelX, labelY);
 
             // Cleanup
             roi.delete();
@@ -183,7 +200,7 @@ async function startCameraAndDetect() {
             roiThresh.delete();
             defectContours.delete();
             defectHierarchy.delete();
-          }
+          });
 
           requestAnimationFrame(processFrame);
         }
