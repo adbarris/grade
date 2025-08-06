@@ -17,7 +17,6 @@ async function startApp() {
     video.onloadedmetadata = () => {
       video.play();
 
-      // Wait one animation frame to ensure video size is available
       requestAnimationFrame(() => {
         const width = video.videoWidth;
         const height = video.videoHeight;
@@ -27,23 +26,33 @@ async function startApp() {
           return;
         }
 
-        const canvas = document.getElementById("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = width;
-        canvas.height = height;
+        // Set up canvases
+        const videoCanvas = document.getElementById("videoCanvas");
+        const overlayCanvas = document.getElementById("overlayCanvas");
+
+        videoCanvas.width = width;
+        videoCanvas.height = height;
+        overlayCanvas.width = width;
+        overlayCanvas.height = height;
+
+        const videoCtx = videoCanvas.getContext("2d");
+        const overlayCtx = overlayCanvas.getContext("2d");
 
         const cap = new cv.VideoCapture(video);
         const src = new cv.Mat(height, width, cv.CV_8UC4);
 
         function processFrame() {
           cap.read(src);
-          cv.imshow("canvas", src);
+          cv.imshow("videoCanvas", src);
+
+          // Clear overlay canvas first
+          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
           // Draw dummy boxes
-          ctx.strokeStyle = "red";
-          ctx.lineWidth = 4;
-          ctx.strokeRect(100, 100, 150, 100);
-          ctx.strokeRect(300, 250, 120, 80);
+          overlayCtx.strokeStyle = "red";
+          overlayCtx.lineWidth = 4;
+          overlayCtx.strokeRect(100, 100, 150, 100); // Dummy knot
+          overlayCtx.strokeRect(300, 250, 120, 80);  // Dummy split
 
           requestAnimationFrame(processFrame);
         }
