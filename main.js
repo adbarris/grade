@@ -138,6 +138,43 @@ async function startCameraAndDetect() {
               }
             });
 
+            // Draw green cuttings (clear sections between defects)
+            const sortedBoxes = currentBoxes.sort((a, b) => a.x - b.x);
+            const cuttingBoxes = [];
+
+            let startX = boardRect.x;
+            const endX = boardRect.x + boardRect.width;
+
+            sortedBoxes.forEach((box) => {
+              const gapWidth = box.x - startX;
+              if (gapWidth > 30) {
+                cuttingBoxes.push({
+                  x: startX,
+                  y: boardRect.y,
+                  w: gapWidth,
+                  h: boardRect.height
+                });
+              }
+              startX = box.x + box.w;
+            });
+
+            // Final section to the right of last defect
+            if (endX - startX > 30) {
+              cuttingBoxes.push({
+                x: startX,
+                y: boardRect.y,
+                w: endX - startX,
+                h: boardRect.height
+              });
+            }
+
+            // Draw green boxes
+            overlayCtx.strokeStyle = "green";
+            overlayCtx.lineWidth = 2;
+            cuttingBoxes.forEach((cut) => {
+              overlayCtx.strokeRect(cut.x, cut.y, cut.w, cut.h);
+            });
+
             previousBoxes = currentBoxes;
 
             // Cleanup
