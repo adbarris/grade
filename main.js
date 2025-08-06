@@ -105,11 +105,19 @@ async function startCameraAndDetect() {
             overlayCtx.strokeStyle = "red";
             overlayCtx.lineWidth = 2;
 
+            const boardArea = boardRect.width * boardRect.height;
+
             for (let i = 0; i < defectContours.size(); ++i) {
               const cnt = defectContours.get(i);
               const rect = cv.boundingRect(cnt);
+              const defectArea = rect.width * rect.height;
 
-              if (rect.width > 20 && rect.height > 20) {
+              // Filter small noise and board-sized false positives
+              if (
+                rect.width > 20 &&
+                rect.height > 20 &&
+                defectArea < 0.6 * boardArea
+              ) {
                 overlayCtx.strokeRect(
                   boardRect.x + rect.x,
                   boardRect.y + rect.y,
