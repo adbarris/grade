@@ -17,16 +17,9 @@ async function startApp() {
     video.onloadedmetadata = () => {
       video.play();
 
-      requestAnimationFrame(() => {
-        const width = video.videoWidth;
-        const height = video.videoHeight;
+      waitForVideoReady(video).then(({ width, height }) => {
+        console.log(`🎥 Video size ready: ${width}x${height}`);
 
-        if (!width || !height) {
-          alert("Video size not available.");
-          return;
-        }
-
-        // Set up canvases
         const videoCanvas = document.getElementById("videoCanvas");
         const overlayCanvas = document.getElementById("overlayCanvas");
 
@@ -42,17 +35,19 @@ async function startApp() {
         const src = new cv.Mat(height, width, cv.CV_8UC4);
 
         function processFrame() {
-          cap.read(src);
-          cv.imshow("videoCanvas", src);
+          try {
+            cap.read(src);
+            cv.imshow("videoCanvas", src);
 
-          // Clear overlay canvas first
-          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-          // Draw dummy boxes
-          overlayCtx.strokeStyle = "red";
-          overlayCtx.lineWidth = 4;
-          overlayCtx.strokeRect(100, 100, 150, 100); // Dummy knot
-          overlayCtx.strokeRect(300, 250, 120, 80);  // Dummy split
+            // Draw dummy boxes
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayCtx.strokeStyle = "red";
+            overlayCtx.lineWidth = 4;
+            overlayCtx.strokeRect(100, 100, 150, 100);
+            overlayCtx.strokeRect(300, 250, 120, 80);
+          } catch (err) {
+            console.error("Frame processing error:", err);
+          }
 
           requestAnimationFrame(processFrame);
         }
@@ -64,4 +59,18 @@ async function startApp() {
     alert("Camera error: " + err.message);
     console.error(err);
   }
+}
+
+// ✅ Wait until video actually reports non-zero size
+function waitForVideoReady(video) {
+  return new Promise((resolve) => {
+    function checkSize() {
+      if (video.videoWidth && video.videoHeight) {
+        resolve({ width: video.videoWidth, height: video.videoHeight });
+      } else {
+        requestAnimationFrame(checkSize);
+      }
+    }
+    checkSize();
+  });
 }
