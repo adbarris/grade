@@ -17,31 +17,39 @@ async function startApp() {
     video.onloadedmetadata = () => {
       video.play();
 
-      const width = video.videoWidth;
-      const height = video.videoHeight;
+      // Wait one animation frame to ensure video size is available
+      requestAnimationFrame(() => {
+        const width = video.videoWidth;
+        const height = video.videoHeight;
 
-      const canvas = document.getElementById("canvas");
-      const ctx = canvas.getContext("2d");
-      canvas.width = width;
-      canvas.height = height;
+        if (!width || !height) {
+          alert("Video size not available.");
+          return;
+        }
 
-      const cap = new cv.VideoCapture(video);
-      const src = new cv.Mat(height, width, cv.CV_8UC4);
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = width;
+        canvas.height = height;
 
-      function processFrame() {
-        cap.read(src);
-        cv.imshow("canvas", src);
+        const cap = new cv.VideoCapture(video);
+        const src = new cv.Mat(height, width, cv.CV_8UC4);
 
-        // Draw dummy boxes
-        ctx.strokeStyle = "red";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(100, 100, 150, 100);
-        ctx.strokeRect(300, 250, 120, 80);
+        function processFrame() {
+          cap.read(src);
+          cv.imshow("canvas", src);
+
+          // Draw dummy boxes
+          ctx.strokeStyle = "red";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(100, 100, 150, 100);
+          ctx.strokeRect(300, 250, 120, 80);
+
+          requestAnimationFrame(processFrame);
+        }
 
         requestAnimationFrame(processFrame);
-      }
-
-      requestAnimationFrame(processFrame);
+      });
     };
   } catch (err) {
     alert("Camera error: " + err.message);
