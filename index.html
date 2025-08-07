@@ -1,38 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Wood Grader</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Wood Lumber Grader</title>
   <style>
-    html, body {
+    body {
       margin: 0;
-      padding: 0;
-      background: black;
       overflow: hidden;
+      background: #000;
+      text-align: center;
     }
-
-    canvas, video {
-      position: absolute;
-      top: 0;
-      left: 0;
+    canvas {
       width: 100vw;
       height: 100vh;
-      object-fit: cover;
-    }
-
-    #overlayCanvas {
-      z-index: 10;
-      pointer-events: none;
+      display: block;
     }
   </style>
 </head>
 <body>
-  <video id="video" autoplay muted playsinline style="display: none;"></video>
-  <canvas id="videoCanvas"></canvas>
-  <canvas id="overlayCanvas"></canvas>
+  <video id="video" playsinline style="display:none;"></video>
+  <canvas id="canvas"></canvas>
 
-  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+  <!-- Load OpenCV -->
+  <script async src="https://docs.opencv.org/4.5.5/opencv.js"></script>
+  <!-- Load your main script -->
   <script src="main.js"></script>
 </body>
 </html>
